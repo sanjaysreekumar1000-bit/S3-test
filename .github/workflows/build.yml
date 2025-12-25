@@ -1,35 +1,38 @@
 
-name: Build ESP32-S3 (2MB USB-CDC)
+name: Build ESP32-S3 Firmware
 
 on:
   push:
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Install Arduino CLI
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-          sudo mv ./bin/arduino-cli /usr/local/bin/
+    - name: Install Arduino CLI
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+        sudo mv ./bin/arduino-cli /usr/local/bin/
 
-      - name: Install ESP32 core
-        run: |
-          arduino-cli config init
-          arduino-cli core update-index
-          arduino-cli core install esp32:esp32
+    - name: Configure Arduino CLI
+      run: |
+        arduino-cli config init
+        arduino-cli core update-index
+        arduino-cli core install esp32:esp32
 
-      - name: Compile for ESP32-S3 SuperMini (2MB, USB-CDC)
-        run: |
-          arduino-cli compile \
-            --fqbn esp32:esp32:esp32s3-devkitc-1 \
-            --output-dir build \
-            S3-test.ino
+    - name: Compile for ESP32-S3 SuperMini (4MB, USB-CDC)
+      run: |
+        arduino-cli compile \
+          --fqbn esp32:esp32:esp32s3:FlashSize=4MB,CDCOnBoot=enabled \
+          --output-dir build \
+          .
 
-      - name: Upload firmware
-        uses: actions/upload-artifact@v4
-        with:
-          name: esp32s3-supermini-2mb
-          path: build/*.bin
+    - name: Upload firmware artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: esp32s3-firmware
+        path: build/*.bin
