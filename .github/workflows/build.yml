@@ -10,65 +10,55 @@ jobs:
 
     steps:
 
-    # Get repo
     - name: Checkout repo
       uses: actions/checkout@v4
 
-    # Install Arduino CLI
     - name: Install Arduino CLI
       run: |
         curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
         sudo mv ./bin/arduino-cli /usr/local/bin/
 
-    # Install ESP32 core
     - name: Configure Arduino
       run: |
         arduino-cli config init
         arduino-cli core update-index
         arduino-cli core install esp32:esp32
 
-
     ####################################################
-    # AUTO-DETECT & NORMALIZE LIBRARIES (Verbose)
+    # AUTO-DETECT + NORMALIZE + INSTALL LIBRARIES
     ####################################################
     - name: Auto-detect & install libraries
       run: |
         echo "🔎 Scanning for libraries..."
 
-        # Read all #include headers → clean → normalize
+        # Extract include names → strip <> "" .h → convert _ to space
         grep -hR '^#include' *.ino \
-        | sed 's/#include[ <"]//; s/[>"].*//' \
+        | sed 's/#include[ <"]//; s/[>"]//g' \
         | sed 's/\.h$//' \
-        | sort -u > includes_raw.txt || true
+        | sed 's/_/ /g' \
+        | sort -u > includes.txt || true
 
         echo ""
-        echo "📄 Detected headers:"
-        cat includes_raw.txt || true
+        echo "📄 Normalized libraries detected:"
+        cat includes.txt || true
         echo ""
 
-        while read raw; do
-          [ -z "$raw" ] && continue
+        while read lib; do
+          [ -z "$lib" ] && continue
 
-          echo "🧩 Header found: $raw"
-
-          # Convert underscores → spaces
-          norm=$(echo "$raw" | sed 's/_/ /g')
-
-          echo "➡ Normalized name: $norm"
-
-          echo "📦 Installing library → $norm"
-          if arduino-cli lib install "$norm"; then
-            echo "✅ Installed successfully"
-          else
-            echo "⚠ Install failed — continuing anyway"
+          echo "📦 Installing → $lib"
+          if arduino-cli lib install "$lib"; then
+            echo "✅ Installed: $lib"
+            echo ""
+            continue
           fi
+
+          echo "⚠ Install failed — continuing"
           echo ""
-
-        done < includes_raw.txt
-
+        done < includes.txt
 
     ####################################################
-    # COMPILE ESP32-S3 (USB-CDC ENABLED BIN)
+    # COMPILE ESP32-S3 (USB CDC ENABLED)
     ####################################################
     - name: Compile firmware
       run: |
@@ -78,9 +68,8 @@ jobs:
           --build-property build.tinyusb_cdc_enabled=1 \
           --output-dir build .
 
-
     ####################################################
-    # PACKAGE + UPLOAD BIN
+    # PACKAGE + UPLOAD BIN FILES
     ####################################################
     - name: Package firmware
       run: zip -j esp32s3-firmware.zip build/*
