@@ -1,4 +1,3 @@
-
 name: Build ESP32-S3 SuperMini Firmware
 
 on:
@@ -30,13 +29,13 @@ jobs:
         arduino-cli lib install "Adafruit NeoPixel"
 
     - name: Compile (ESP32-S3 Forced USB-CDC)
-  run: |
-    arduino-cli compile \
-      --fqbn esp32:esp32:esp32s3 \
-      --build-property build.cdc_on_boot=1 \
-      --build-property build.tinyusb_cdc_enabled=1 \
-      --output-dir build \
-      .
+      run: |
+        arduino-cli compile \
+          --fqbn esp32:esp32:esp32s3 \
+          --build-property build.cdc_on_boot=1 \
+          --build-property build.tinyusb_cdc_enabled=1 \
+          --output-dir build \
+          .
 
     - name: Package firmware
       run: |
