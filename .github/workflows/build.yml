@@ -1,15 +1,18 @@
-name: Build ESP32-S3 Firmware
+
+name: Build ESP32-S3 SuperMini Firmware
 
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
     - name: Install Arduino CLI
       run: |
@@ -22,19 +25,24 @@ jobs:
         arduino-cli core update-index
         arduino-cli core install esp32:esp32
 
-    - name: Install NeoPixel Library
+    - name: Install WS2812 / NeoPixel Library
       run: |
         arduino-cli lib install "Adafruit NeoPixel"
 
-    - name: Compile (ESP32-S3)
+    - name: Compile (ESP32-S3 + USB-CDC)
       run: |
         arduino-cli compile \
           --fqbn esp32:esp32:esp32s3 \
+          --build-property CDCOnBoot=enabled \
           --output-dir build \
           .
 
-    - name: Upload Firmware
+    - name: Package firmware
+      run: |
+        zip -j esp32s3-firmware.zip build/*
+
+    - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
         name: esp32s3-firmware
-        path: build/*.bin
+        path: esp32s3-firmware.zip
