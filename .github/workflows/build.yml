@@ -10,87 +10,65 @@ jobs:
 
     steps:
 
+    # Get repo
     - name: Checkout repo
       uses: actions/checkout@v4
 
+    # Install Arduino CLI
     - name: Install Arduino CLI
       run: |
         curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
         sudo mv ./bin/arduino-cli /usr/local/bin/
 
+    # Install ESP32 core
     - name: Configure Arduino
       run: |
         arduino-cli config init
         arduino-cli core update-index
         arduino-cli core install esp32:esp32
 
-    ####################################################
-    # AUTO-DETECT & INSTALL LIBRARIES (VERBOSE LOGGING)
-    ####################################################
-    - name: Auto-detect & install libraries (Verbose)
-      run: |
-        echo "🔍 Scanning for libraries…"
 
-        # Extract #include lines → strip symbols → remove .h → dedupe
+    ####################################################
+    # AUTO-DETECT & NORMALIZE LIBRARIES (Verbose)
+    ####################################################
+    - name: Auto-detect & install libraries
+      run: |
+        echo "🔎 Scanning for libraries..."
+
+        # Read all #include headers → clean → normalize
         grep -hR '^#include' *.ino \
         | sed 's/#include[ <"]//; s/[>"].*//' \
         | sed 's/\.h$//' \
-        | sort -u > includes.txt || true
+        | sort -u > includes_raw.txt || true
 
-        echo
+        echo ""
         echo "📄 Detected headers:"
-        cat includes.txt || true
-        echo
+        cat includes_raw.txt || true
+        echo ""
 
-        while read lib; do
-          [ -z "$lib" ] && continue
+        while read raw; do
+          [ -z "$raw" ] && continue
 
-          echo "----------------------------------------"
-          echo "🧩 Header: $lib"
+          echo "🧩 Header found: $raw"
 
-          # 1️⃣ Try exact library name
-          echo "➡ Trying exact: $lib"
-          if arduino-cli lib install "$lib"; then
-            echo "✅ Installed: $lib"
-            continue
+          # Convert underscores → spaces
+          norm=$(echo "$raw" | sed 's/_/ /g')
+
+          echo "➡ Normalized name: $norm"
+
+          echo "📦 Installing library → $norm"
+          if arduino-cli lib install "$norm"; then
+            echo "✅ Installed successfully"
           else
-            echo "❌ Exact match failed"
+            echo "⚠ Install failed — continuing anyway"
           fi
+          echo ""
 
-          # 2️⃣ Try replacing _ with spaces
-          spaced=$(echo "$lib" | sed 's/_/ /g')
-          if [ "$spaced" != "$lib" ]; then
-            echo "➡ Trying spaced name: $spaced"
-            if arduino-cli lib install "$spaced"; then
-              echo "✅ Installed: $spaced"
-              continue
-            else
-              echo "❌ Spaced attempt failed"
-            fi
-          fi
+        done < includes_raw.txt
 
-          # 3️⃣ Search Arduino library index for closest match
-          echo "➡ Searching library index for: $lib"
-          match=$(arduino-cli lib search "$lib" | awk 'NR==2{print $1}')
-
-          if [ -n "$match" ]; then
-            echo "🔎 Match found → $match"
-            if arduino-cli lib install "$match"; then
-              echo "✅ Installed (resolved): $match"
-            else
-              echo "⚠ Install failed but continuing"
-            fi
-          else
-            echo "⚠ No package found for: $lib"
-          fi
-
-        done < includes.txt
-
-        echo
-        echo "🎉 Library scan completed"
 
     ####################################################
-    # COMPILE ESP32-S3 (USB CDC ENABLED)
+    # COMPILE ESP32-S3 (USB-CDC ENABLED BIN)
     ####################################################
     - name: Compile firmware
       run: |
@@ -100,8 +78,9 @@ jobs:
           --build-property build.tinyusb_cdc_enabled=1 \
           --output-dir build .
 
+
     ####################################################
-    # PACKAGE BIN FILES
+    # PACKAGE + UPLOAD BIN
     ####################################################
     - name: Package firmware
       run: zip -j esp32s3-firmware.zip build/*
