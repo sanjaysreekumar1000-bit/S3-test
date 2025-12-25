@@ -17,25 +17,20 @@ jobs:
         curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
         sudo mv ./bin/arduino-cli /usr/local/bin/
 
-    - name: Configure Arduino CLI
+    - name: Install ESP32 Core
       run: |
         arduino-cli config init
         arduino-cli core update-index
         arduino-cli core install esp32:esp32
 
-    - name: Compile for ESP32-S3 SuperMini (USB-CDC)
+    - name: Compile (ESP32-S3)
       run: |
-        if arduino-cli compile \
-          --fqbn esp32:esp32:esp32s3:CDCOnBoot=true \
-          --output-dir build . ; then
-          exit 0
-        fi
         arduino-cli compile \
-          --fqbn esp32:esp32:esp32s3:CDCOnBoot=enabled \
+          --fqbn esp32:esp32:esp32s3 \
           --output-dir build \
           .
 
-    - name: Upload firmware artifact
+    - name: Upload Firmware
       uses: actions/upload-artifact@v4
       with:
         name: esp32s3-firmware
