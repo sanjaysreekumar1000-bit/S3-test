@@ -1,8 +1,7 @@
-name: ESP32 Auto Builder
+name: ESP32-S3 Auto Builder
 
 on:
   push:
-    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -10,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
     - name: Checkout repo
       uses: actions/checkout@v4
 
@@ -24,28 +24,63 @@ jobs:
         arduino-cli core update-index
         arduino-cli core install esp32:esp32
 
+    ####################################################
+    # AUTO-DETECT + INSTALL LIBRARIES
+    ####################################################
     - name: Auto-detect & install libraries
       run: |
-        echo "Scanning for libraries..."
-        grep -hR '^#include' *.ino | sed 's/#include[ <"]//; s/[>"].*//' | sort -u > includes.txt || true
+        echo "Scanning for libraries…"
+
+        # Extract #include headers → strip symbols → dedupe list
+        grep -hR '^#include' *.ino \
+        | sed 's/#include[ <"]//; s/[>"].*//' \
+        | sort -u > includes.txt || true
 
         while read lib; do
-          echo "Installing $lib"
-          arduino-cli lib install "$lib" || true
+          [ -z "$lib" ] && continue
+
+          base=$(echo "$lib" | sed 's/.h$//')
+
+          # ---------- AUTO MAPPINGS ----------
+          case "$base" in
+            Adafruit_NeoPixel)   pkg="Adafruit NeoPixel" ;;
+            Adafruit_GFX)        pkg="Adafruit GFX Library" ;;
+            Adafruit_Sensor)     pkg="Adafruit Unified Sensor" ;;
+            ArduinoJson)         pkg="ArduinoJson" ;;
+            FastLED)             pkg="FastLED" ;;
+            TFT_eSPI)            pkg="TFT_eSPI" ;;
+            Servo)               pkg="Servo" ;;
+            WiFi)                pkg="WiFi" ;;
+            Wire)                pkg="Wire" ;;
+            SPI)                 pkg="SPI" ;;
+            *)                   pkg="$base" ;;
+          esac
+          # -----------------------------------
+
+          echo "Installing: $pkg"
+          arduino-cli lib install "$pkg" || true
+
         done < includes.txt
 
-    - name: Compile firmware (ESP32-S3)
+    ####################################################
+    # COMPILE FIRMWARE (ESP32-S3 USB-CDC ENABLED)
+    ####################################################
+    - name: Compile firmware
       run: |
         arduino-cli compile \
           --fqbn esp32:esp32:esp32s3 \
-          --output-dir build \
-          .
+          --build-property build.cdc_on_boot=1 \
+          --build-property build.tinyusb_cdc_enabled=1 \
+          --output-dir build .
 
+    ####################################################
+    # ZIP & UPLOAD BIN FILES
+    ####################################################
     - name: Package firmware
-      run: zip -j esp32-firmware.zip build/*
+      run: zip -j esp32s3-firmware.zip build/*
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
-        name: esp32-firmware
-        path: esp32-firmware.zip
+        name: esp32s3-firmware
+        path: esp32s3-firmware.zip
