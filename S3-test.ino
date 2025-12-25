@@ -6,11 +6,15 @@
 Adafruit_NeoPixel pixel(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 void setup() {
+  Serial.begin(115200);
   pixel.begin();
   pixel.setBrightness(50);
 }
 
 void loop() {
+  Serial.println();
+  Serial.println("ESP32-S3 SuperMini — USB CDC ONLINE");
+  Serial.println("Blinking LED to confirm program running");
   pixel.setPixelColor(0, pixel.Color(255, 0, 0)); // RED
   pixel.show();
   delay(400);
