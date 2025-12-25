@@ -25,54 +25,72 @@ jobs:
         arduino-cli core install esp32:esp32
 
     ####################################################
-    # FULLY AUTOMATIC LIBRARY DETECTION
+    # AUTO-DETECT & INSTALL LIBRARIES (VERBOSE LOGGING)
     ####################################################
-    - name: Auto-detect & install libraries
+    - name: Auto-detect & install libraries (Verbose)
       run: |
-        echo "Scanning for libraries…"
+        echo "🔍 Scanning for libraries…"
 
+        # Extract #include lines → strip symbols → remove .h → dedupe
         grep -hR '^#include' *.ino \
         | sed 's/#include[ <"]//; s/[>"].*//' \
         | sed 's/\.h$//' \
         | sort -u > includes.txt || true
 
-        echo "Found libraries:"
+        echo
+        echo "📄 Detected headers:"
         cat includes.txt || true
         echo
 
         while read lib; do
           [ -z "$lib" ] && continue
-          echo ">>> Processing: $lib"
 
-          # 1️⃣ Try exact name
+          echo "----------------------------------------"
+          echo "🧩 Header: $lib"
+
+          # 1️⃣ Try exact library name
+          echo "➡ Trying exact: $lib"
           if arduino-cli lib install "$lib"; then
-            echo "Installed: $lib"
+            echo "✅ Installed: $lib"
             continue
+          else
+            echo "❌ Exact match failed"
           fi
 
-          # 2️⃣ Try underscore → space
+          # 2️⃣ Try replacing _ with spaces
           spaced=$(echo "$lib" | sed 's/_/ /g')
           if [ "$spaced" != "$lib" ]; then
-            echo "Retrying as: $spaced"
+            echo "➡ Trying spaced name: $spaced"
             if arduino-cli lib install "$spaced"; then
-              echo "Installed: $spaced"
+              echo "✅ Installed: $spaced"
               continue
+            else
+              echo "❌ Spaced attempt failed"
             fi
           fi
 
-          # 3️⃣ Search Arduino library index dynamically
-          match=$(arduino-cli lib search "$lib" | head -2 | tail -1 | awk -F' ' '{print $1}')
+          # 3️⃣ Search Arduino library index for closest match
+          echo "➡ Searching library index for: $lib"
+          match=$(arduino-cli lib search "$lib" | awk 'NR==2{print $1}')
+
           if [ -n "$match" ]; then
-            echo "Auto-resolved → $match"
-            arduino-cli lib install "$match" || true
+            echo "🔎 Match found → $match"
+            if arduino-cli lib install "$match"; then
+              echo "✅ Installed (resolved): $match"
+            else
+              echo "⚠ Install failed but continuing"
+            fi
           else
-            echo "⚠ Could not resolve: $lib — continuing anyway"
+            echo "⚠ No package found for: $lib"
           fi
 
         done < includes.txt
 
+        echo
+        echo "🎉 Library scan completed"
+
     ####################################################
-    # COMPILE ESP32-S3 (USB-CDC ON)
+    # COMPILE ESP32-S3 (USB CDC ENABLED)
     ####################################################
     - name: Compile firmware
       run: |
@@ -83,7 +101,7 @@ jobs:
           --output-dir build .
 
     ####################################################
-    # PACKAGE BIN
+    # PACKAGE BIN FILES
     ####################################################
     - name: Package firmware
       run: zip -j esp32s3-firmware.zip build/*
