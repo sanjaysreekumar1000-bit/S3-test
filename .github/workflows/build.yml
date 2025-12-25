@@ -1,8 +1,6 @@
-name: Build ESP32-S3 SuperMini Firmware
+name: ESP32 Auto Library Builder
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -10,39 +8,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Install Arduino CLI
       run: |
         curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
         sudo mv ./bin/arduino-cli /usr/local/bin/
 
-    - name: Configure Arduino CLI
+    - name: Configure Arduino
       run: |
-        arduino-cli config init
         arduino-cli core update-index
         arduino-cli core install esp32:esp32
 
-    - name: Install WS2812 / NeoPixel Library
+    - name: Auto-detect & install libraries
       run: |
-        arduino-cli lib install "Adafruit NeoPixel"
+        echo "Scanning for libraries..."
+        grep -hoR '^#include <[^>]*>' src/*.ino | sed 's/#include <//; s/>//' | sort -u > includes.txt
+        
+        while read lib; do
+          echo "Installing $lib"
+          arduino-cli lib install "$lib" || true
+        done < includes.txt
 
-    - name: Compile (ESP32-S3 Forced USB-CDC)
+    - name: Compile firmware
       run: |
         arduino-cli compile \
           --fqbn esp32:esp32:esp32s3 \
-          --build-property build.cdc_on_boot=1 \
-          --build-property build.tinyusb_cdc_enabled=1 \
-          --output-dir build \
-          .
-
-    - name: Package firmware
-      run: |
-        zip -j esp32s3-firmware.zip build/*
+          --output-dir build src
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
-        name: esp32s3-firmware
-        path: esp32s3-firmware.zip
+        name: firmware
+        path: build/*.bin
