@@ -24,7 +24,7 @@ jobs:
       - name: Compile for ESP32-S3 SuperMini (2MB, USB-CDC)
         run: |
           arduino-cli compile \
-            --fqbn esp32:esp32:esp32s3:FlashSize=2MB,CDCOnBoot=true \
+            --fqbn esp32:esp32:esp32s3-devkitc-1 \
             --output-dir build \
             S3-test.ino
 
