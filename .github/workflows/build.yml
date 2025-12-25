@@ -1,4 +1,4 @@
-name: ESP32-S3 Auto Builder
+name: ESP32-S3 Auto BIN Builder
 
 on:
   push:
@@ -25,30 +25,54 @@ jobs:
         arduino-cli core install esp32:esp32
 
     ####################################################
-    # AUTO-DETECT + INSTALL LIBRARIES (.h stripped)
+    # FULLY AUTOMATIC LIBRARY DETECTION
     ####################################################
     - name: Auto-detect & install libraries
       run: |
         echo "Scanning for libraries…"
 
-        # Extract #include headers → clean → strip .h → dedupe
         grep -hR '^#include' *.ino \
         | sed 's/#include[ <"]//; s/[>"].*//' \
         | sed 's/\.h$//' \
         | sort -u > includes.txt || true
 
-        echo "Libraries detected:"
+        echo "Found libraries:"
         cat includes.txt || true
         echo
 
         while read lib; do
           [ -z "$lib" ] && continue
-          echo "Installing: $lib"
-          arduino-cli lib install "$lib" || true
+          echo ">>> Processing: $lib"
+
+          # 1️⃣ Try exact name
+          if arduino-cli lib install "$lib"; then
+            echo "Installed: $lib"
+            continue
+          fi
+
+          # 2️⃣ Try underscore → space
+          spaced=$(echo "$lib" | sed 's/_/ /g')
+          if [ "$spaced" != "$lib" ]; then
+            echo "Retrying as: $spaced"
+            if arduino-cli lib install "$spaced"; then
+              echo "Installed: $spaced"
+              continue
+            fi
+          fi
+
+          # 3️⃣ Search Arduino library index dynamically
+          match=$(arduino-cli lib search "$lib" | head -2 | tail -1 | awk -F' ' '{print $1}')
+          if [ -n "$match" ]; then
+            echo "Auto-resolved → $match"
+            arduino-cli lib install "$match" || true
+          else
+            echo "⚠ Could not resolve: $lib — continuing anyway"
+          fi
+
         done < includes.txt
 
     ####################################################
-    # COMPILE FIRMWARE (ESP32-S3 + USB-CDC)
+    # COMPILE ESP32-S3 (USB-CDC ON)
     ####################################################
     - name: Compile firmware
       run: |
@@ -59,7 +83,7 @@ jobs:
           --output-dir build .
 
     ####################################################
-    # ZIP & UPLOAD BIN FILES
+    # PACKAGE BIN
     ####################################################
     - name: Package firmware
       run: zip -j esp32s3-firmware.zip build/*
