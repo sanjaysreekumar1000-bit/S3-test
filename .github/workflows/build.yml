@@ -25,45 +25,30 @@ jobs:
         arduino-cli core install esp32:esp32
 
     ####################################################
-    # AUTO-DETECT + INSTALL LIBRARIES
+    # AUTO-DETECT + INSTALL LIBRARIES (.h stripped)
     ####################################################
     - name: Auto-detect & install libraries
       run: |
         echo "Scanning for libraries…"
 
-        # Extract #include headers → strip symbols → dedupe list
+        # Extract #include headers → clean → strip .h → dedupe
         grep -hR '^#include' *.ino \
         | sed 's/#include[ <"]//; s/[>"].*//' \
+        | sed 's/\.h$//' \
         | sort -u > includes.txt || true
+
+        echo "Libraries detected:"
+        cat includes.txt || true
+        echo
 
         while read lib; do
           [ -z "$lib" ] && continue
-
-          base=$(echo "$lib" | sed 's/.h$//')
-
-          # ---------- AUTO MAPPINGS ----------
-          case "$base" in
-            Adafruit_NeoPixel)   pkg="Adafruit NeoPixel" ;;
-            Adafruit_GFX)        pkg="Adafruit GFX Library" ;;
-            Adafruit_Sensor)     pkg="Adafruit Unified Sensor" ;;
-            ArduinoJson)         pkg="ArduinoJson" ;;
-            FastLED)             pkg="FastLED" ;;
-            TFT_eSPI)            pkg="TFT_eSPI" ;;
-            Servo)               pkg="Servo" ;;
-            WiFi)                pkg="WiFi" ;;
-            Wire)                pkg="Wire" ;;
-            SPI)                 pkg="SPI" ;;
-            *)                   pkg="$base" ;;
-          esac
-          # -----------------------------------
-
-          echo "Installing: $pkg"
-          arduino-cli lib install "$pkg" || true
-
+          echo "Installing: $lib"
+          arduino-cli lib install "$lib" || true
         done < includes.txt
 
     ####################################################
-    # COMPILE FIRMWARE (ESP32-S3 USB-CDC ENABLED)
+    # COMPILE FIRMWARE (ESP32-S3 + USB-CDC)
     ####################################################
     - name: Compile firmware
       run: |
