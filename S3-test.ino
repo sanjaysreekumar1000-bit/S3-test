@@ -13,7 +13,6 @@ void setup() {
 
 void loop() {
   Serial.println();
-  Serial.println("ESP32-S3 SuperMini — USB CDC ONLINE");
   Serial.println("Blinking LED to confirm program running");
   pixel.setPixelColor(0, pixel.Color(255, 0, 0)); // RED
   pixel.show();
