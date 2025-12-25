@@ -1,4 +1,3 @@
-
 name: Build ESP32-S3 Firmware
 
 on:
@@ -24,10 +23,10 @@ jobs:
         arduino-cli core update-index
         arduino-cli core install esp32:esp32
 
-    - name: Compile for ESP32-S3 SuperMini (4MB, USB-CDC)
+    - name: Compile for ESP32-S3 SuperMini (USB-CDC)
       run: |
         arduino-cli compile \
-          --fqbn esp32:esp32:esp32s3:FlashSize=4MB,CDCOnBoot=enabled \
+          --fqbn esp32:esp32:esp32s3:CDCOnBoot=enabled \
           --output-dir build \
           .
 
