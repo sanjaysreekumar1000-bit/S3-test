@@ -4,7 +4,7 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include <RemoteXY.h>
-#include <Servo.h>
+#include <ESP32Servo>
 #include <FastLED.h>
 
 #define LED_PIN 48
