@@ -25,40 +25,32 @@ jobs:
         arduino-cli core install esp32:esp32
 
     ####################################################
-    # AUTO-DETECT + NORMALIZE + INSTALL LIBRARIES
+    # AUTO-DETECT + CLEAN + INSTALL LIBRARIES
     ####################################################
     - name: Auto-detect & install libraries
       run: |
-        echo "🔎 Scanning for libraries..."
+        echo "🔍 Scanning for libraries…"
 
-        # Extract include names → strip <> "" .h → convert _ to space
+        # Extract includes → strip symbols → normalize names
         grep -hR '^#include' *.ino \
-        | sed 's/#include[ <"]//; s/[>"]//g' \
+        | sed 's/#include//; s/[<>""]//g' \
         | sed 's/\.h$//' \
         | sed 's/_/ /g' \
+        | xargs -n1 echo \
         | sort -u > includes.txt || true
 
-        echo ""
         echo "📄 Normalized libraries detected:"
         cat includes.txt || true
-        echo ""
+        echo
 
         while read lib; do
           [ -z "$lib" ] && continue
-
           echo "📦 Installing → $lib"
-          if arduino-cli lib install "$lib"; then
-            echo "✅ Installed: $lib"
-            echo ""
-            continue
-          fi
-
-          echo "⚠ Install failed — continuing"
-          echo ""
+          arduino-cli lib install "$lib" || true
         done < includes.txt
 
     ####################################################
-    # COMPILE ESP32-S3 (USB CDC ENABLED)
+    # COMPILE ESP32-S3 (USB-CDC ENABLED)
     ####################################################
     - name: Compile firmware
       run: |
@@ -69,7 +61,7 @@ jobs:
           --output-dir build .
 
     ####################################################
-    # PACKAGE + UPLOAD BIN FILES
+    # PACKAGE BIN
     ####################################################
     - name: Package firmware
       run: zip -j esp32s3-firmware.zip build/*
