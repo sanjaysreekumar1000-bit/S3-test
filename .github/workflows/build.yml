@@ -29,13 +29,14 @@ jobs:
       run: |
         arduino-cli lib install "Adafruit NeoPixel"
 
-    - name: Compile (ESP32-S3 + USB-CDC)
-      run: |
-        arduino-cli compile \
-          --fqbn esp32:esp32:esp32s3 \
-          --build-property CDCOnBoot=enabled \
-          --output-dir build \
-          .
+    - name: Compile (ESP32-S3 Forced USB-CDC)
+  run: |
+    arduino-cli compile \
+      --fqbn esp32:esp32:esp32s3 \
+      --build-property build.cdc_on_boot=1 \
+      --build-property build.tinyusb_cdc_enabled=1 \
+      --output-dir build \
+      .
 
     - name: Package firmware
       run: |
