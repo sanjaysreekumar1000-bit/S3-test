@@ -1,72 +1,75 @@
 name: ESP32-S3 Auto BIN Builder
 
 on:
-  push:
-  workflow_dispatch:
+  push:
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-    steps:
+    steps:
 
-    - name: Checkout repo
-      uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-    - name: Install Arduino CLI
-      run: |
-        curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-        sudo mv ./bin/arduino-cli /usr/local/bin/
+    - name: Install Arduino CLI
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+        sudo mv ./bin/arduino-cli /usr/local/bin/
 
-    - name: Configure Arduino
-      run: |
-        arduino-cli config init
-        arduino-cli core update-index
-        arduino-cli core install esp32:esp32
+    - name: Configure Arduino
+      run: |
+        arduino-cli config init
+        arduino-cli core update-index
+        arduino-cli core install esp32:esp32
 
-    ####################################################
-    #  AUTO-DETECT & INSTALL LIBRARIES (FIXED VERSION)
-    ####################################################
-    - name: Auto-detect & install libraries
-      run: |
-        echo "🔍 Scanning for libraries…"
+    ####################################################
+    #  AUTO-DETECT & INSTALL LIBRARIES
+    ####################################################
+    - name: Auto-detect & install libraries
+      run: |
+        echo "🔍 Scanning for libraries…"
+        grep -hR '^#include' *.ino \
+        | sed 's/#include//; s/[<>""]//g' \
+        | sed 's/\.h$//' \
+        | sed 's/_/ /g' \
+        | sort -u > includes.txt || true
 
-        # Extract include names → clean → keep full names together
-        grep -hR '^#include' *.ino \
-        | sed 's/#include//; s/[<>""]//g' \
-        | sed 's/\.h$//' \
-        | sed 's/_/ /g' \
-        | sort -u > includes.txt || true
+        echo "📄 Libraries detected:"
+        cat includes.txt || true
+        echo
 
-        echo "📄 Normalized libraries detected:"
-        cat includes.txt || true
-        echo
+        while read lib; do
+          [ -z "$lib" ] && continue
+          echo "📦 Installing → $lib"
+          arduino-cli lib install "$lib" || true
+        done < includes.txt
 
-        while read lib; do
-          [ -z "$lib" ] && continue
-          echo "📦 Installing → $lib"
-          arduino-cli lib install "$lib" || true
-        done < includes.txt
+    ####################################################
+    #  AUTO-DETECT MAIN .INO & COMPILE
+    ####################################################
+    - name: Compile firmware
+      run: |
+        SKETCH=$(ls *.ino | head -n1)
+        echo "📌 Using sketch: $SKETCH"
 
-    ####################################################
-    #  COMPILE FIRMWARE (USB-CDC ENABLED)
-    ####################################################
-    - name: Compile firmware
-      run: |
-        arduino-cli compile \
-          --fqbn esp32:esp32:esp32s3 \
-          --build-property build.cdc_on_boot=1 \
-          --build-property build.tinyusb_cdc_enabled=1 \
-          --output-dir build .
+        arduino-cli compile \
+          --fqbn esp32:esp32:esp32s3 \
+          --build-property build.cdc_on_boot=1 \
+          --build-property build.tinyusb_cdc_enabled=1 \
+          --output-dir build \
+          "$SKETCH"
 
-    ####################################################
-    #  PACKAGE & UPLOAD BIN FILES
-    ####################################################
-    - name: Package firmware
-      run: zip -j esp32s3-firmware.zip build/*
+    ####################################################
+    #  PACKAGE & UPLOAD BIN
+    ####################################################
+    - name: Package firmware
+      run: zip -j esp32s3-firmware.zip build/*
 
-    - name: Upload firmware
-      uses: actions/upload-artifact@v4
-      with:
-        name: esp32s3-firmware
-        path: esp32s3-firmware.zip
+    - name: Upload firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: esp32s3-firmware
+        path: esp32s3-firmware.zip
+        
