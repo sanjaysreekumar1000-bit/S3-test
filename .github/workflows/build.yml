@@ -53,11 +53,14 @@ jobs:
     ####################################################
     - name: Compile firmware
       run: |
+        SKETCH=$(ls *.ino | head -n1)
+        echo "Compiling $SKETCH"
         arduino-cli compile \
-          --fqbn esp32:esp32:esp32s3 \
-          --build-property build.cdc_on_boot=1 \
-          --build-property build.tinyusb_cdc_enabled=1 \
-          --output-dir build .
+        --fqbn esp32:esp32:esp32s3 \
+        --build-property build.cdc_on_boot=1 \
+        --build-property build.tinyusb_cdc_enabled=1 \
+        --output-dir build \
+        "$SKETCH"
 
     ####################################################
     #  PACKAGE & UPLOAD BIN FILES
